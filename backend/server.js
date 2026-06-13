@@ -19,8 +19,9 @@ app.use(cors({
   origin: [
     'https://ihandyandy.com',
     'http://localhost:3001',
-    process.env.DASHBOARD_URL || ''
-  ].filter(Boolean)
+    'https://dashboard-q599mizle-andrew-c-projects.vercel.app',
+    'http://localhost:3000'
+  ]
 }));
 app.use(express.json());
 
