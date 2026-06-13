@@ -11,13 +11,13 @@
 .dashboard {
   min-height: 100vh;
   background-color: var(--dark-navy);
-  padding: 20px;
+  padding: 15px;
 }
 
 .dashboard-header {
   max-width: 1400px;
-  margin: 0 auto 40px;
-  padding: 30px;
+  margin: 0 auto 30px;
+  padding: 25px;
   background: linear-gradient(135deg, var(--navy) 0%, var(--dark-navy) 100%);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -25,46 +25,52 @@
 }
 
 .dashboard-header h1 {
-  font-size: 32px;
-  margin-bottom: 10px;
+  font-size: 28px;
+  margin-bottom: 8px;
   color: var(--orange);
 }
 
 .dashboard-header p {
   color: var(--gray-dark);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .controls {
   max-width: 1400px;
-  margin: 0 auto 30px;
+  margin: 0 auto 25px;
   display: flex;
-  gap: 20px;
-  align-items: center;
+  gap: 15px;
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 
 .date-range {
   display: flex;
-  gap: 15px;
+  gap: 12px;
   flex-wrap: wrap;
+  flex: 1;
+  min-width: 300px;
 }
 
 .date-range label {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--gray-light);
+  flex: 1;
+  min-width: 200px;
 }
 
 .date-range input {
-  padding: 8px 12px;
+  padding: 8px 10px;
   background-color: var(--navy);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--gray-light);
-  font-size: 14px;
+  font-size: 12px;
+  flex: 1;
+  min-width: 150px;
 }
 
 .date-range input:focus {
@@ -79,7 +85,7 @@
   color: white;
   border: none;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: background-color 0.2s;
   white-space: nowrap;
@@ -97,7 +103,7 @@
   border: 1px solid var(--orange);
   border-radius: 6px;
   color: var(--orange);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .loading {
@@ -105,20 +111,34 @@
   margin: 40px auto;
   text-align: center;
   color: var(--gray-dark);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .metrics-grid {
   max-width: 1400px;
-  margin: 0 auto 40px;
+  margin: 0 auto 30px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
 }
 
 .analysis-section {
   max-width: 1400px;
-  margin: 0 auto 40px;
+  margin: 0 auto 30px;
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 20px;
@@ -138,22 +158,22 @@
 }
 
 .clicks-breakdown h2 {
-  font-size: 18px;
-  margin-bottom: 20px;
+  font-size: 16px;
+  margin-bottom: 15px;
   color: var(--gray-light);
 }
 
 .button-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .button-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
+  padding: 10px;
   background-color: rgba(255, 107, 53, 0.05);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -161,7 +181,7 @@
 
 .button-name {
   color: var(--gray-light);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -171,8 +191,219 @@
 
 .button-count {
   color: var(--orange);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   margin-left: 10px;
   white-space: nowrap;
+}
+
+.breakdown-section {
+  max-width: 1400px;
+  margin: 0 auto 30px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.device-breakdown,
+.browser-breakdown {
+  background-color: var(--navy);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.device-breakdown h2,
+.browser-breakdown h2 {
+  font-size: 16px;
+  margin-bottom: 15px;
+  color: var(--gray-light);
+}
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: rgba(255, 107, 53, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.breakdown-label {
+  color: var(--gray-light);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.breakdown-count {
+  color: var(--orange);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 10px;
+  }
+
+  .dashboard-header {
+    margin: 0 auto 20px;
+    padding: 20px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 24px;
+  }
+
+  .dashboard-header p {
+    font-size: 12px;
+  }
+
+  .controls {
+    margin: 0 auto 20px;
+    flex-direction: column;
+  }
+
+  .date-range {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .date-range label {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .date-range input {
+    width: 100%;
+  }
+
+  .refresh-btn {
+    width: 100%;
+  }
+
+  .analysis-section {
+    gap: 15px;
+  }
+
+  .clicks-breakdown,
+  .device-breakdown,
+  .browser-breakdown {
+    padding: 15px;
+  }
+
+  .clicks-breakdown h2,
+  .device-breakdown h2,
+  .browser-breakdown h2 {
+    font-size: 14px;
+  }
+
+  .button-item,
+  .breakdown-item {
+    padding: 8px;
+  }
+
+  .button-name,
+  .breakdown-label {
+    font-size: 12px;
+  }
+
+  .button-count,
+  .breakdown-count {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 8px;
+  }
+
+  .dashboard-header {
+    margin: 0 auto 15px;
+    padding: 15px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 20px;
+    margin-bottom: 5px;
+  }
+
+  .dashboard-header p {
+    font-size: 11px;
+  }
+
+  .controls {
+    margin: 0 auto 15px;
+    gap: 10px;
+  }
+
+  .date-range {
+    gap: 8px;
+  }
+
+  .date-range label {
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .date-range input {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .refresh-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .metrics-grid {
+    margin: 0 auto 20px;
+    gap: 8px;
+  }
+
+  .analysis-section {
+    gap: 12px;
+  }
+
+  .clicks-breakdown,
+  .device-breakdown,
+  .browser-breakdown {
+    padding: 12px;
+  }
+
+  .clicks-breakdown h2,
+  .device-breakdown h2,
+  .browser-breakdown h2 {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .button-list,
+  .breakdown-list {
+    gap: 8px;
+  }
+
+  .button-item,
+  .breakdown-item {
+    padding: 6px;
+  }
+
+  .button-name,
+  .breakdown-label {
+    font-size: 11px;
+  }
+
+  .button-count,
+  .breakdown-count {
+    font-size: 11px;
+  }
 }

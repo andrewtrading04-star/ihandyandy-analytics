@@ -14,12 +14,18 @@ function Dashboard({ backendUrl }) {
     pageViews: 0,
     clicks: 0,
     formInteractions: 0,
-    scrollDepth: 0
+    scrollDepth: 0,
+    pageExits: 0,
+    activeUsers: 0,
+    avgTimeOnPage: 0,
+    bounceRate: 0
   });
 
   const [clicksByButton, setClicksByButton] = useState({});
   const [funnel, setFunnel] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [deviceBreakdown, setDeviceBreakdown] = useState({});
+  const [browserBreakdown, setBrowserBreakdown] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -61,16 +67,48 @@ function Dashboard({ backendUrl }) {
       const scrollData = await scrollRes.json();
       const sessionsData = await sessionsRes.json();
 
+      // Calculate device and browser breakdown
+      const devices = {};
+      const browsers = {};
+      let totalPageExits = 0;
+      let totalTimeOnPage = 0;
+      let pageExitCount = 0;
+
+      if (sessionsData.sessions) {
+        sessionsData.sessions.forEach(session => {
+          session.events?.forEach(event => {
+            if (event.metadata?.device) devices[event.metadata.device] = (devices[event.metadata.device] || 0) + 1;
+            if (event.metadata?.browser) browsers[event.metadata.browser] = (browsers[event.metadata.browser] || 0) + 1;
+            if (event.type === 'page_exit') {
+              totalPageExits += 1;
+              totalTimeOnPage += event.metadata?.time_spent_seconds || 0;
+              pageExitCount += 1;
+            }
+          });
+        });
+      }
+
+      const avgTime = pageExitCount > 0 ? Math.round(totalTimeOnPage / pageExitCount) : 0;
+      const bounceRate = sessionsData.sessions?.length > 0
+        ? Math.round((sessionsData.sessions.filter(s => s.event_count <= 1).length / sessionsData.sessions.length) * 100)
+        : 0;
+
       setMetrics({
         pageViews: pageViewsData.total,
         clicks: clicksData.total,
         formInteractions: formData.total,
-        scrollDepth: scrollData.average_depth || 0
+        scrollDepth: scrollData.average_depth || 0,
+        pageExits: totalPageExits,
+        activeUsers: sessionsData.sessions?.length || 0,
+        avgTimeOnPage: avgTime,
+        bounceRate: bounceRate
       });
 
       setClicksByButton(clicksData.by_button || {});
       setFunnel(funnelData.funnel || []);
       setSessions(sessionsData.sessions || []);
+      setDeviceBreakdown(devices);
+      setBrowserBreakdown(browsers);
     } catch (err) {
       console.error('Analytics error:', err);
       setError(err.message);
@@ -150,6 +188,30 @@ function Dashboard({ backendUrl }) {
               color="orange"
             />
             <MetricsCard
+              title="Active Users"
+              value={metrics.activeUsers}
+              icon="👥"
+              color="orange"
+            />
+            <MetricsCard
+              title="Avg Time on Page"
+              value={`${metrics.avgTimeOnPage}s`}
+              icon="⏱️"
+              color="orange"
+            />
+            <MetricsCard
+              title="Bounce Rate"
+              value={`${metrics.bounceRate}%`}
+              icon="📉"
+              color="orange"
+            />
+            <MetricsCard
+              title="Page Exits"
+              value={metrics.pageExits}
+              icon="🚪"
+              color="orange"
+            />
+            <MetricsCard
               title="Avg Scroll Depth"
               value={`${metrics.scrollDepth}%`}
               icon="📜"
@@ -169,6 +231,36 @@ function Dashboard({ backendUrl }) {
                     <div key={buttonId} className="button-item">
                       <span className="button-name">{buttonId}</span>
                       <span className="button-count">{count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="breakdown-section">
+            <div className="device-breakdown">
+              <h2>Devices</h2>
+              <div className="breakdown-list">
+                {Object.entries(deviceBreakdown)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([device, count]) => (
+                    <div key={device} className="breakdown-item">
+                      <span className="breakdown-label">{device}</span>
+                      <span className="breakdown-count">{count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            <div className="browser-breakdown">
+              <h2>Browsers</h2>
+              <div className="breakdown-list">
+                {Object.entries(browserBreakdown)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([browser, count]) => (
+                    <div key={browser} className="breakdown-item">
+                      <span className="breakdown-label">{browser}</span>
+                      <span className="breakdown-count">{count}</span>
                     </div>
                   ))}
               </div>
