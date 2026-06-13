@@ -3,7 +3,7 @@
 // Inject this into your website via Landingsite.ai code injection
 
 (function() {
-  const BACKEND_URL = 'https://your-backend-url.vercel.app'; // Replace with your backend URL
+  const BACKEND_URL = 'https://backend-6azf0a434-andrew-c-projects.vercel.app'; // Analytics backend
   const SESSION_ID = generateSessionId();
   const PAGE_ID = generatePageId();
   let pageStartTime = Date.now();
