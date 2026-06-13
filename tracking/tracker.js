@@ -2,7 +2,7 @@
 // Captures all user behavior data
 
 (function() {
-  const BACKEND_URL = 'https://backend-6azf0a434-andrew-c-projects.vercel.app';
+  const BACKEND_URL = 'https://backend-beryl-seven-95.vercel.app';
   const SESSION_ID = generateSessionId();
   const PAGE_ID = generatePageId();
   let pageStartTime = performance.now();

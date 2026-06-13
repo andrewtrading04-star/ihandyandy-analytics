@@ -8,350 +8,263 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Supabase
+// Initialize Supabase with the SERVICE ROLE key (server-side only).
+// This lets us keep Row Level Security ON while the backend can still write.
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-// Middleware
-app.use(cors({
-  origin: [
-    'https://ihandyandy.com',
-    'http://localhost:3001',
-    'https://dashboard-q599mizle-andrew-c-projects.vercel.app',
-    'http://localhost:3000'
-  ]
-}));
-app.use(express.json());
+// Allow requests from anywhere (the website and the dashboard are both browsers
+// hitting this API; no cookies/credentials are used, so * is safe here).
+app.use(cors());
+
+// Parse EVERY request body as JSON regardless of Content-Type.
+// navigator.sendBeacon() sends "text/plain", so the default express.json()
+// (which only parses application/json) was silently dropping all events.
+app.use(express.json({ type: () => true, limit: '200kb' }));
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Receive tracking events
+// Receive tracking events. Stores known fields as columns and EVERYTHING
+// else into the metadata JSON, so no data is ever lost.
 app.post('/api/events', async (req, res) => {
   try {
-    const event = req.body;
+    const event = req.body || {};
 
-    // Validate required fields
     if (!event.event_type || !event.session_id) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields (event_type, session_id)' });
     }
 
-    // Store in appropriate table based on event type
-    let table = 'events'; // Default table
-    let data = {
-      event_type: event.event_type,
-      session_id: event.session_id,
-      page_id: event.page_id,
-      page_url: event.page_url,
-      page_title: event.page_title,
-      timestamp: event.timestamp,
-      user_agent: event.user_agent,
-      referrer: event.referrer,
-      metadata: {} // Store extra data as JSON
+    const {
+      event_type,
+      session_id,
+      page_id,
+      page_url,
+      page_title,
+      timestamp,
+      user_agent,
+      referrer,
+      ...rest
+    } = event;
+
+    const row = {
+      event_type,
+      session_id,
+      page_id: page_id || `na_${Date.now()}`,
+      page_url: page_url || null,
+      page_title: page_title || null,
+      timestamp: timestamp || new Date().toISOString(),
+      user_agent: user_agent || null,
+      referrer: referrer || null,
+      metadata: rest // all the rich data: device, browser, depth_percent, element_id, etc.
     };
 
-    // Handle event-specific data
-    if (event.event_type === 'button_click') {
-      data.metadata = {
-        button_text: event.button_text,
-        button_id: event.button_id,
-        button_class: event.button_class,
-        target_url: event.target_url
-      };
-    } else if (event.event_type === 'form_interaction') {
-      data.metadata = {
-        field_name: event.field_name,
-        field_type: event.field_type,
-        field_id: event.field_id,
-        form_id: event.form_id,
-        value_length: event.value_length
-      };
-    } else if (event.event_type === 'scroll_depth') {
-      data.metadata = {
-        depth_percent: event.depth_percent
-      };
-    } else if (event.event_type === 'time_on_page') {
-      data.metadata = {
-        seconds: event.seconds
-      };
-    }
-
-    const { error } = await supabase
-      .from('events')
-      .insert([data]);
+    const { error } = await supabase.from('events').insert([row]);
 
     if (error) {
       console.error('Supabase insert error:', error);
-      return res.status(500).json({ error: 'Failed to store event' });
+      return res.status(500).json({ error: 'Failed to store event', detail: error.message });
     }
 
-    res.json({ success: true, event_id: event.page_id });
+    res.json({ success: true });
   } catch (error) {
     console.error('Event handler error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// API: Get page views
+// Helper: apply optional date range
+function applyRange(query, from, to) {
+  if (from && to) return query.gte('timestamp', from).lte('timestamp', to);
+  return query;
+}
+
+// API: Page views
 app.get('/api/analytics/page-views', async (req, res) => {
   try {
     const { from, to } = req.query;
-    let query = supabase
-      .from('events')
-      .select('*')
-      .eq('event_type', 'page_view');
-
-    if (from && to) {
-      query = query
-        .gte('timestamp', from)
-        .lte('timestamp', to);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await applyRange(
+      supabase.from('events').select('*').eq('event_type', 'page_view'),
+      from, to
+    );
     if (error) throw error;
-
-    res.json({
-      total: data.length,
-      events: data,
-      timestamp: new Date().toISOString()
-    });
+    res.json({ total: data.length, events: data, timestamp: new Date().toISOString() });
   } catch (error) {
-    console.error('Error fetching page views:', error);
+    console.error('page-views error:', error);
     res.status(500).json({ error: 'Failed to fetch page views' });
   }
 });
 
-// API: Get button clicks
+// API: Clicks (covers both new "click" and legacy "button_click")
 app.get('/api/analytics/clicks', async (req, res) => {
   try {
     const { from, to } = req.query;
-    let query = supabase
-      .from('events')
-      .select('*')
-      .eq('event_type', 'button_click');
-
-    if (from && to) {
-      query = query
-        .gte('timestamp', from)
-        .lte('timestamp', to);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await applyRange(
+      supabase.from('events').select('*').in('event_type', ['click', 'button_click']),
+      from, to
+    );
     if (error) throw error;
 
-    // Aggregate by button
     const byButton = {};
-    data.forEach(click => {
-      const buttonId = click.metadata?.button_id || 'unnamed';
-      byButton[buttonId] = (byButton[buttonId] || 0) + 1;
+    data.forEach(c => {
+      const label =
+        c.metadata?.element_text ||
+        c.metadata?.element_id ||
+        c.metadata?.button_id ||
+        c.metadata?.button_text ||
+        'unnamed';
+      byButton[label] = (byButton[label] || 0) + 1;
     });
 
-    res.json({
-      total: data.length,
-      by_button: byButton,
-      events: data,
-      timestamp: new Date().toISOString()
-    });
+    res.json({ total: data.length, by_button: byButton, events: data });
   } catch (error) {
-    console.error('Error fetching clicks:', error);
+    console.error('clicks error:', error);
     res.status(500).json({ error: 'Failed to fetch clicks' });
   }
 });
 
-// API: Get form interactions
+// API: Form interactions
 app.get('/api/analytics/form-interactions', async (req, res) => {
   try {
     const { from, to } = req.query;
-    let query = supabase
-      .from('events')
-      .select('*')
-      .eq('event_type', 'form_interaction');
-
-    if (from && to) {
-      query = query
-        .gte('timestamp', from)
-        .lte('timestamp', to);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await applyRange(
+      supabase.from('events').select('*').eq('event_type', 'form_interaction'),
+      from, to
+    );
     if (error) throw error;
 
-    // Aggregate by field
     const byField = {};
-    data.forEach(interaction => {
-      const fieldName = interaction.metadata?.field_name || 'unnamed';
-      if (!byField[fieldName]) {
-        byField[fieldName] = { count: 0, types: {} };
-      }
-      byField[fieldName].count += 1;
-      const type = interaction.metadata?.field_type || 'unknown';
-      byField[fieldName].types[type] = (byField[fieldName].types[type] || 0) + 1;
+    data.forEach(i => {
+      const name = i.metadata?.field_name || 'unnamed';
+      if (!byField[name]) byField[name] = { count: 0, types: {} };
+      byField[name].count += 1;
+      const t = i.metadata?.field_type || 'unknown';
+      byField[name].types[t] = (byField[name].types[t] || 0) + 1;
     });
 
-    res.json({
-      total: data.length,
-      by_field: byField,
-      events: data,
-      timestamp: new Date().toISOString()
-    });
+    res.json({ total: data.length, by_field: byField, events: data });
   } catch (error) {
-    console.error('Error fetching form interactions:', error);
+    console.error('form-interactions error:', error);
     res.status(500).json({ error: 'Failed to fetch form interactions' });
   }
 });
 
-// API: Get sessions with event sequences
+// API: Sessions (all events grouped by session)
 app.get('/api/analytics/sessions', async (req, res) => {
   try {
     const { from, to, limit = 50 } = req.query;
-    let query = supabase
-      .from('events')
-      .select('*')
-      .order('timestamp', { ascending: true });
-
-    if (from && to) {
-      query = query
-        .gte('timestamp', from)
-        .lte('timestamp', to);
-    }
-
-    const { data, error } = await query.limit(limit * 20); // Get more to group by session
+    const { data, error } = await applyRange(
+      supabase.from('events').select('*').order('timestamp', { ascending: true }),
+      from, to
+    );
     if (error) throw error;
 
-    // Group by session
     const sessions = {};
-    data.forEach(event => {
-      if (!sessions[event.session_id]) {
-        sessions[event.session_id] = {
-          session_id: event.session_id,
-          start_time: event.timestamp,
-          end_time: event.timestamp,
+    data.forEach(e => {
+      if (!sessions[e.session_id]) {
+        sessions[e.session_id] = {
+          session_id: e.session_id,
+          start_time: e.timestamp,
+          end_time: e.timestamp,
           events: [],
           event_count: 0,
-          referrer: event.referrer
+          referrer: e.referrer
         };
       }
-      sessions[event.session_id].events.push({
-        type: event.event_type,
-        timestamp: event.timestamp,
-        metadata: event.metadata
-      });
-      sessions[event.session_id].end_time = event.timestamp;
-      sessions[event.session_id].event_count += 1;
+      const s = sessions[e.session_id];
+      s.events.push({ type: e.event_type, timestamp: e.timestamp, metadata: e.metadata });
+      s.end_time = e.timestamp;
+      s.event_count += 1;
     });
 
-    const sessionsList = Object.values(sessions).slice(0, limit);
+    const list = Object.values(sessions)
+      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+      .slice(0, Number(limit));
 
-    res.json({
-      total: sessionsList.length,
-      sessions: sessionsList,
-      timestamp: new Date().toISOString()
-    });
+    res.json({ total: list.length, sessions: list });
   } catch (error) {
-    console.error('Error fetching sessions:', error);
+    console.error('sessions error:', error);
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
 
-// API: Get funnel analysis (page view -> click -> form interaction)
+// API: Funnel (page view -> click -> form submit)
 app.get('/api/analytics/funnel', async (req, res) => {
   try {
     const { from, to } = req.query;
-    let baseQuery = supabase.from('events').select('*');
-
-    if (from && to) {
-      baseQuery = baseQuery
-        .gte('timestamp', from)
-        .lte('timestamp', to);
-    }
-
-    const { data, error } = await baseQuery;
+    const { data, error } = await applyRange(
+      supabase.from('events').select('event_type, session_id'),
+      from, to
+    );
     if (error) throw error;
 
-    // Count events by type
-    const eventCounts = {};
+    const counts = {};
     const sessionSteps = {};
-
-    data.forEach(event => {
-      eventCounts[event.event_type] = (eventCounts[event.event_type] || 0) + 1;
-
-      // Track funnel progression per session
-      if (!sessionSteps[event.session_id]) {
-        sessionSteps[event.session_id] = new Set();
-      }
-      sessionSteps[event.session_id].add(event.event_type);
+    data.forEach(e => {
+      counts[e.event_type] = (counts[e.event_type] || 0) + 1;
+      if (!sessionSteps[e.session_id]) sessionSteps[e.session_id] = new Set();
+      sessionSteps[e.session_id].add(e.event_type);
     });
 
-    // Calculate funnel
-    const pageViews = eventCounts['page_view'] || 0;
-    const clicks = eventCounts['button_click'] || 0;
-    const formInteractions = eventCounts['form_interaction'] || 0;
-
-    const sessionsWithPageView = Object.values(sessionSteps).filter(s => s.has('page_view')).length;
-    const sessionsWithClick = Object.values(sessionSteps).filter(s => s.has('page_view') && s.has('button_click')).length;
-    const sessionsWithForm = Object.values(sessionSteps).filter(s =>
-      s.has('page_view') && s.has('button_click') && s.has('form_interaction')
-    ).length;
+    const has = (s, ...types) => types.some(t => s.has(t));
+    const all = Object.values(sessionSteps);
+    const sPV = all.filter(s => has(s, 'page_view')).length;
+    const sClick = all.filter(s => has(s, 'page_view') && has(s, 'click', 'button_click')).length;
+    const sForm = all.filter(s => has(s, 'page_view') && has(s, 'click', 'button_click') && has(s, 'form_submit', 'form_interaction')).length;
 
     res.json({
       funnel: [
-        { step: 'Page View', count: pageViews, sessions: sessionsWithPageView },
-        { step: 'Button Click', count: clicks, sessions: sessionsWithClick },
-        { step: 'Form Interaction', count: formInteractions, sessions: sessionsWithForm }
+        { step: 'Page View', count: counts['page_view'] || 0, sessions: sPV },
+        { step: 'Click', count: (counts['click'] || 0) + (counts['button_click'] || 0), sessions: sClick },
+        { step: 'Form / Booking', count: (counts['form_submit'] || 0) + (counts['form_interaction'] || 0), sessions: sForm }
       ],
-      total_sessions: Object.keys(sessionSteps).length,
-      timestamp: new Date().toISOString()
+      total_sessions: all.length
     });
   } catch (error) {
-    console.error('Error fetching funnel:', error);
-    res.status(500).json({ error: 'Failed to fetch funnel data' });
+    console.error('funnel error:', error);
+    res.status(500).json({ error: 'Failed to fetch funnel' });
   }
 });
 
-// API: Get scroll depth stats
+// API: Scroll depth (covers new "scroll" and legacy "scroll_depth")
 app.get('/api/analytics/scroll-depth', async (req, res) => {
   try {
     const { from, to } = req.query;
-    let query = supabase
-      .from('events')
-      .select('*')
-      .eq('event_type', 'scroll_depth');
-
-    if (from && to) {
-      query = query
-        .gte('timestamp', from)
-        .lte('timestamp', to);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await applyRange(
+      supabase.from('events').select('metadata').in('event_type', ['scroll', 'scroll_depth']),
+      from, to
+    );
     if (error) throw error;
 
-    const depthStats = {};
-    data.forEach(event => {
-      const depth = event.metadata?.depth_percent || 0;
-      depthStats[depth] = (depthStats[depth] || 0) + 1;
+    const dist = {};
+    let sum = 0;
+    data.forEach(e => {
+      const d = e.metadata?.depth_percent || 0;
+      dist[d] = (dist[d] || 0) + 1;
+      sum += d;
     });
 
     res.json({
       total: data.length,
-      depth_distribution: depthStats,
-      average_depth: data.length > 0
-        ? Math.round(data.reduce((sum, e) => sum + (e.metadata?.depth_percent || 0), 0) / data.length)
-        : 0,
-      timestamp: new Date().toISOString()
+      depth_distribution: dist,
+      average_depth: data.length ? Math.round(sum / data.length) : 0
     });
   } catch (error) {
-    console.error('Error fetching scroll depth:', error);
+    console.error('scroll-depth error:', error);
     res.status(500).json({ error: 'Failed to fetch scroll depth' });
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Analytics backend running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-});
+// Only listen locally. On Vercel the app is exported and invoked as a function.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Analytics backend running on port ${PORT}`);
+  });
+}
+
+export default app;
