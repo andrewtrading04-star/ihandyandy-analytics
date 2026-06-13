@@ -1,0 +1,117 @@
+:root {
+  --navy: #001f3f;
+  --dark-navy: #0f172a;
+  --orange: #ff6b35;
+  --orange-light: #ff8c5a;
+  --gray-light: #e0e7ff;
+  --gray-dark: #4b5563;
+  --border: #2d3748;
+}
+
+.funnel-card {
+  background-color: var(--navy);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 30px;
+}
+
+.funnel-card h2 {
+  font-size: 18px;
+  margin-bottom: 25px;
+  color: var(--gray-light);
+}
+
+.funnel-card h3 {
+  font-size: 14px;
+  margin-bottom: 15px;
+  color: var(--gray-dark);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.no-data {
+  color: var(--gray-dark);
+  font-size: 14px;
+  text-align: center;
+  padding: 30px;
+}
+
+.funnel-container {
+  margin-bottom: 30px;
+}
+
+.funnel-step {
+  margin-bottom: 15px;
+}
+
+.funnel-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 15px;
+  background: linear-gradient(90deg, rgba(255, 107, 53, 0.3), rgba(255, 107, 53, 0.1));
+  border: 1px solid rgba(255, 107, 53, 0.3);
+  border-radius: 6px;
+  min-height: 44px;
+  transition: all 0.3s ease;
+}
+
+.funnel-bar:hover {
+  background: linear-gradient(90deg, rgba(255, 107, 53, 0.4), rgba(255, 107, 53, 0.2));
+  border-color: var(--orange);
+}
+
+.funnel-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-light);
+}
+
+.funnel-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--orange);
+  margin-left: auto;
+  padding-left: 15px;
+}
+
+.funnel-dropoff {
+  font-size: 12px;
+  color: var(--gray-dark);
+  text-align: right;
+  padding-right: 15px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.funnel-stats {
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.conversion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conversion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: rgba(255, 107, 53, 0.05);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.conversion-item span:first-child {
+  color: var(--gray-light);
+  font-weight: 500;
+}
+
+.conversion-percent {
+  color: var(--orange);
+  font-weight: 600;
+}
